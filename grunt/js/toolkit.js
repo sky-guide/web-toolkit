@@ -51,7 +51,9 @@ if (typeof window.define === "function" && window.define.amd) {
         'modules',
         'modules/tabs',
         'modules/share',
-        'modules/carousel'], function(skycons, hashmanager, popup, modules, tabs, share, carousel){
+        'modules/carousel',
+        'modules/remoterecord'
+    ], function(skycons, hashmanager, popup, modules, tabs, share, carousel, remoterecord){
 
 
         return {
@@ -61,7 +63,8 @@ if (typeof window.define === "function" && window.define.amd) {
             popup: popup,
             tabs: tabs,
             share: share,
-            carousel: carousel
+            carousel: carousel,
+            remoterecord: remoterecord
         };
     });
 }

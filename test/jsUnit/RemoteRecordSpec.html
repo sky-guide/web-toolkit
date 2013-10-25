@@ -1,0 +1,102 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <script src="../../dist/scripts/lib/jquery-2.0.3.js"></script>
+    <script src="vendor/mocha.js"></script>
+    <script src="vendor/require.js"></script>
+    <script src="config.js"></script>
+
+</head>
+<body>
+<!--PLACEHOLDER FOR MOCHA TEST RESULTS-->
+<div id="mocha"></div>
+
+<!--FIXTURE HTML FOR TESTS-->
+<div id="spec-markup">
+    <div id="eventId" class="remote-record" data-channel-id="4053" data-event-id="218"></div>
+    <div id="startTime" class="remote-record" data-channel-id="4053" data-start-time="1369845598"></div>
+    <div id="button3" class="remote-record" data-channel-id="4053" data-start-time="1369845598" data-theme="dark"></div>
+    <div id="noStartTime" class="remote-record" data-channel-id="4053"></div>
+    <div id="noChannelId" class="remote-record" data-start-time="4053"></div>
+</div>
+
+</div>
+<script>
+    globalskycom = {
+        browserSupport: {
+            isMobile: function () {
+                return false;
+            }
+        }
+    };
+</script>
+
+<!--TEST-->
+<script>
+    require(['modules/remoterecord', '../../test/jsUnit/setup'], function (hash) {
+
+        describe('Remote Record Buttons', function () {
+
+            beforeEach(function () {
+                // Initialise smoax and register the matchers
+                chai.use(smoax.setup());
+            });
+
+            afterEach(function () {
+                // Revert $.ajax to a real ajax implementation
+                smoax.release();
+            });
+
+            it('renders an invalid error when button has missing attributes', function () {
+                $('#noStartTime').skycom_remoterecord();
+                $('#noChannelId').skycom_remoterecord();
+
+                expect($('#noStartTime').html()).to.equal('required attributes data-channel-id or data-event-id / data-start-time not found');
+                expect($('#noChannelId').html()).to.equal('required attributes data-channel-id or data-event-id / data-start-time not found');
+            });
+
+            it('gets series link information when a channel id and event id is provided', function () {
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218/', {});
+                $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
+            });
+
+            it('gets epg details when channel id and start time is provided', function () {
+                smoax.register('GET', '/stub/prog/json/lookup/4053/1369845598', {"eid":218});
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {});
+
+                $('#startTime').skycom_remoterecord({epgServicesUrl: '/stub/'});
+
+                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/lookup/4053/1369845598');
+                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
+            });
+
+            it('Records a programme correctly', function () {
+
+            });
+
+            it('Records Series link correctly', function () {
+
+            });
+
+            it('Does not show series link when not available', function () {
+
+            });
+
+            it('Does not populate button when an error occurs', function () {
+
+            });
+
+            it('Brings up login box when user is not signed in', function () {
+
+            });
+        });
+
+        mocha.run();
+
+    });
+</script>
+
+</body>
+</html>
