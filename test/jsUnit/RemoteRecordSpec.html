@@ -16,7 +16,6 @@
 <div id="spec-markup">
     <div id="eventId" class="remote-record" data-channel-id="4053" data-event-id="218"></div>
     <div id="startTime" class="remote-record" data-channel-id="4053" data-start-time="1369845598"></div>
-    <div id="button3" class="remote-record" data-channel-id="4053" data-start-time="1369845598" data-theme="dark"></div>
     <div id="noStartTime" class="remote-record" data-channel-id="4053"></div>
     <div id="noChannelId" class="remote-record" data-start-time="4053"></div>
 </div>
@@ -57,19 +56,49 @@
             });
 
             it('gets series link information when a channel id and event id is provided', function () {
-                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218/', {});
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {});
                 $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                 expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
             });
 
             it('gets epg details when channel id and start time is provided', function () {
-                smoax.register('GET', '/stub/prog/json/lookup/4053/1369845598', {"eid":218});
-                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {});
+                smoax.register('GET', '/stub/prog/json/lookup/4053/1369845598', {"eid": 218});
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'S'});
 
                 $('#startTime').skycom_remoterecord({epgServicesUrl: '/stub/'});
 
                 expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/lookup/4053/1369845598');
                 expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
+            });
+
+            it('generates a button if programme detail is available', function () {
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "R"});
+                $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                expect($('#eventId').children('.remote-record').length).to.equal(1);
+            });
+
+            it('will generate only one button if remote record called several times', function () {
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "R"});
+                for (var i = 0; i < 5; i++) {
+                    $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                    expect($('#eventId').children('.remote-record').length).to.equal(1);
+                }
+            });
+
+            it('builds a dialog with series link if the programme has a series link', function () {
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "S"});
+                $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                expect($('#eventId').children('.popover').length).to.equal(1);
+            });
+
+            it('does not build a dialog if the programme has no series link', function () {
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "R"});
+                $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                expect($('#eventId').children('.popover').length).to.equal(0);
+            });
+
+            it('Brings up login box when user is not signed in', function () {
+
             });
 
             it('Records a programme correctly', function () {
@@ -80,17 +109,10 @@
 
             });
 
-            it('Does not show series link when not available', function () {
-
-            });
-
             it('Does not populate button when an error occurs', function () {
 
             });
 
-            it('Brings up login box when user is not signed in', function () {
-
-            });
         });
 
         mocha.run();
