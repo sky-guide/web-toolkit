@@ -10,76 +10,101 @@ toolkit.remoterecord = (function (window, $) {
         this.element = element;
 
         if (this.channelId && ( this.eventId || this.startTime )) {
-            if (this.eventId) {
-                this.getSeriesInfo();
-            } else {
-                this.getProgrammeInfo();
-            }
+            this.appendButton();
         }
         else {
-            element.html('required attributes data-channel-id or data-event-id / data-start-time not found');
+            this.showMissingAttributeError();
         }
     }
 
     RemoteRecordButton.prototype = {
-        getProgrammeInfo: function () {
-            var self = this;
-            $.get(this.options.epgServicesUrl + 'prog/json/lookup/' + this.channelId + '/' + this.startTime, function (resp) {
-                self.eventId = resp.eid;
-                self.getSeriesInfo();
-            }, 'json');
+
+        showMissingAttributeError: function () {
+            this.element.html('required attributes data-channel-id or data-event-id / data-start-time not found');
         },
 
-        getSeriesInfo: function () {
-            var self = this;
-            $.get(this.options.epgServicesUrl + 'prog/json/serieslinkinfo/' + this.channelId + '/' + this.eventId, function (resp) {
-                self.isSeriesLink = ( resp.rr == 'S' );
-                self.generateMarkup();
-            }, 'json');
-        },
-
-        generateMarkup: function () {
+        appendButton: function () {
             var self = this,
                 buttonHtml = '<div role="button" class="remote-record">Record</div>',
                 button = $(buttonHtml).on('click', function () {
-                    if (self.isSeriesLink) {
-                        self.showRemoteRecordPopover();
-                    } else {
-                        self.recordOnce();
-                    }
+                    self.triggerRecord()
                 });
 
             this.element.empty();
             this.element.append(button);
+        },
 
-            if (this.isSeriesLink) {
-                var popoverHtml = '<ul class="popover"></ul>',
-                    popover = $(popoverHtml),
-                    recordOnceHtml = '<li><a>Record Once</a></li>',
-                    recordOnce = $(recordOnceHtml).on('click', self.recordOnce),
-                    recordSeriesHtml = '<li><a>Record Series</a></li>',
-                    recordSeries = $(recordSeriesHtml).on('click', self.recordSeries);
-
-                popover.append(recordOnce);
-                popover.append(recordSeries);
-                this.element.append(popover);
+        triggerRecord: function () {
+            if (this.eventId == undefined) {
+                this.getEventId();
+            } else {
+                this.showPopoverOrRecord();
             }
         },
 
-        recordOnce: function () {
-
+        getEventId: function () {
+            var self = this;
+            $.get(this.options.epgServicesUrl + 'prog/json/lookup/' + this.channelId + '/' + this.startTime, function (resp) {
+                self.eventId = resp.eid;
+                self.showPopoverOrRecord();
+            }, 'json');
         },
 
-        recordSeries: function () {
-            console.log('record series');
+        showPopoverOrRecord: function () {
+            var self = this;
+            $.get(this.options.epgServicesUrl + 'prog/json/serieslinkinfo/' + this.channelId + '/' + this.eventId, function (seriesInfo) {
+                self.isSeriesLink = ( seriesInfo.rr == 'S' );
+                if (self.isSeriesLink) {
+                    $.get(self.options.epgServicesUrl + 'rractivation/json/serieslinkenabled', function (seriesLinkEnabled) {
+                        self.showRemoteRecordPopover();
+                    }, 'json');
+                } else {
+                    self.record(false);
+                }
+            }, 'json');
+        },
+
+        record: function (isSeries) {
+            var self = this;
+            $.get(this.options.epgServicesUrl + 'prog/json/rr/' + this.channelId + '/' + this.eventId + ( isSeries ? '?sl=true' : '' ), function (resp) {
+                if (resp.status == '401') {
+                    self.showLoginScreen();
+                } else {
+                    var rrButton = self.find('.remote-record');
+                    rrButton.off('click');
+                    srrButton.addClass('recorded');
+                    if (self.isSeriesLink) {
+                        rrButton.addClass('series');
+                    }
+                }
+            }, 'json');
         },
 
         showLoginScreen: function () {
-
+            var self = this;
+            popup.init();
+            popup.open({
+                url: 'https://skyid.sky.com/signin/?appearance=compact&successUrl='
+                    + encodeURI(window.loation.href)
+                    + '&cancelUrl='
+                    + encodeURI(window.loation.href),
+                width: 400,
+                height: 380
+            });
         },
 
         showRemoteRecordPopover: function () {
-            console.log('remote record popup');
+            var self = this,
+                popoverHtml = '<ul class="popover"></ul>',
+                popover = $(popoverHtml),
+                recordOnceHtml = '<li><a>Record Once</a></li>',
+                recordOnce = $(recordOnceHtml).on('click', self.record(false)),
+                recordSeriesHtml = '<li><a>Record Series</a></li>',
+                recordSeries = $(recordSeriesHtml).on('click', self.record(true));
+            popover.append(recordOnce);
+            popover.append(recordSeries);
+            this.element.append(popover);
+            this.element.find('.popover').addClass('active');
         }
 
     };
@@ -96,7 +121,8 @@ toolkit.remoterecord = (function (window, $) {
     };
 }
     (window, jQuery)
-    );
+    )
+;
 
 if (typeof window.define === "function" && window.define.amd) {
     define('modules/remoterecord', [], function () {
