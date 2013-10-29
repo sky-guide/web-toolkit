@@ -9,7 +9,7 @@ toolkit.remoterecord = (function(window, $) {
         this.startTime = element.data('startTime');
         this.element = element;
 
-        if (this.channelId && ( this.eventId || this.startTime )) {
+        if (this.channelId && (this.eventId || this.startTime)) {
             this.appendButton();
         } else {
             this.showMissingAttributeError();
@@ -42,33 +42,35 @@ toolkit.remoterecord = (function(window, $) {
 
         getEventId: function() {
             var self = this;
-            $.get(this.options.epgServicesUrl + 'prog/json/lookup/' + this.channelId + '/' + this.startTime, function(resp) {
-                self.eventId = resp.eid;
-                self.showPopoverOrRecord();
-            }, 'json');
+            $.ajax({url: this.options.epgServicesUrl + 'prog/json/lookup/' + this.channelId + '/' + this.startTime, dataType: 'json'})
+                .done(function(resp) {
+                    self.eventId = resp.eid;
+                    self.showPopoverOrRecord();
+                });
         },
 
         showPopoverOrRecord: function() {
             var self = this;
-            $.get(this.options.epgServicesUrl + 'prog/json/serieslinkinfo/' + this.channelId + '/' + this.eventId, function(seriesInfoResp) {
-                self.isSeriesLink = ( seriesInfoResp.rr == 'S' );
-                if (self.isSeriesLink) {
-                    $.get(self.options.epgServicesUrl + 'rractivation/json/serieslinkenabled')
-                        .done(function() {
-                            self.showRemoteRecordPopover();
-                        })
-                        .fail(function() {
-                            self.authenticate();
-                        });
-                } else {
-                    self.record(false);
-                }
-            }, 'json');
+            $.ajax({url: this.options.epgServicesUrl + 'prog/json/serieslinkinfo/' + this.channelId + '/' + this.eventId, dataType: 'json'})
+                .done(function(seriesInfoResp) {
+                    self.isSeriesLink = ( seriesInfoResp.rr == 'S' );
+                    if (self.isSeriesLink) {
+                        $.ajax({url: self.options.epgServicesUrl + 'rractivation/json/serieslinkenabled', dataType: 'json'})
+                            .done(function() {
+                                self.showRemoteRecordPopover();
+                            })
+                            .fail(function() {
+                                self.authenticate();
+                            });
+                    } else {
+                        self.record(false);
+                    }
+                });
         },
 
         record: function(isSeries) {
             var self = this;
-            $.get(this.options.epgServicesUrl + 'prog/json/rr/' + this.channelId + '/' + this.eventId + ( isSeries ? '?sl=true' : '' ))
+            $.ajax({url: this.options.epgServicesUrl + 'prog/json/rr/' + this.channelId + '/' + this.eventId + ( isSeries ? '?sl=true' : '' ), dataType: 'json'})
                 .done(function() {
                     var rrButton = self.element.find('.remote-record');
                     rrButton.off('click');
