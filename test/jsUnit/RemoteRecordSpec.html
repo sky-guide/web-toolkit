@@ -24,7 +24,7 @@
 <script>
     globalskycom = {
         browserSupport: {
-            isMobile: function () {
+            isMobile: function() {
                 return false;
             }
         }
@@ -33,33 +33,33 @@
 
 <!--TEST-->
 <script>
-    require(['modules/remoterecord', '../../test/jsUnit/setup'], function (hash) {
+    require(['modules/remoterecord', '../../test/jsUnit/setup'], function(hash) {
 
-        describe('Remote Record Buttons', function () {
+        describe('Remote Record Buttons', function() {
 
-            beforeEach(function () {
+            beforeEach(function() {
                 // Initialise smoax and register the matchers
                 chai.use(smoax.setup());
             });
 
-            afterEach(function () {
+            afterEach(function() {
                 // Revert $.ajax to a real ajax implementation
                 smoax.release();
             });
 
-            it('generates a remote record button', function () {
+            it('generates a remote record button', function() {
                 $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                 expect($('#eventId').children('.remote-record').length).to.equal(1);
             });
 
-            it('will generate only one button if remote record called several times', function () {
+            it('will generate only one button if remote record called several times', function() {
                 for (var i = 0; i < 5; i++) {
                     $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                     expect($('#eventId').children('.remote-record').length).to.equal(1);
                 }
             });
 
-            it('renders an invalid error when button has missing attributes', function () {
+            it('renders an invalid error when button has missing attributes', function() {
                 $('#noStartTime').skycom_remoterecord();
                 $('#noChannelId').skycom_remoterecord();
 
@@ -67,43 +67,107 @@
                 expect($('#noChannelId').html()).to.equal('required attributes data-channel-id or data-event-id / data-start-time not found');
             });
 
-            it('gets epg details when channel id and start time is provided', function () {
+            it('gets epg details when channel id and start time is provided', function() {
                 smoax.register('GET', '/stub/prog/json/lookup/4053/1369845598', {"eid": 218});
-                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {});
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "S"});
+                smoax.register('GET', '/stub/rractivation/json/serieslinkenabled', {});
 
                 $('#startTime').skycom_remoterecord({epgServicesUrl: '/stub/'});
                 $('#startTime .remote-record').click();
 
                 expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/lookup/4053/1369845598');
                 expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
+
             });
 
-            it('gets series link information when a channel id and event id is provided and series is remote record', function () {
-                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr":'S'});
-                smoax.register('GET', '/stub/rractivation/json/serieslinkenabled', {});
+            it('when the item is not a series link, records the programme', function() {
+                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'R'});
+                smoax.register('GET', '/stub/prog/json/rr/4053/218', {})
+                expect($('#eventId').children('.remote-record .recorded').length).to.equal(0);
 
                 $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                 $('#eventId .remote-record').click();
 
-                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
-                expect(smoax).to.have.beenInvokedWith('get', '/stub/rractivation/json/serieslinkenabled');
+                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218');
+                expect($('#eventId').children('.remote-record .recorded').length).to.equal(1);
             });
 
-            it('Brings up login box when user is not signed in', function () {
+            describe('record from popover menu', function() {
+
+                beforeEach(function() {
+                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'S'});
+                    smoax.register('GET', '/stub/rractivation/json/serieslinkenabled', {});
+
+                    $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                    $('#eventId .remote-record').click();
+                });
+
+                it('series information is checked', function() {
+                    expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
+                    expect(smoax).to.have.beenInvokedWith('get', '/stub/rractivation/json/serieslinkenabled');
+                });
+
+                it('record once', function() {
+                    smoax.register('GET', '/stub/prog/json/rr/4053/218', {})
+
+                    $('#eventId .record-once').click();
+
+                    expect($('#eventId').children('.remote-record .recorded').length).to.equal(1);
+                    expect($('#eventId').children('.remote-record .series').length).to.equal(0);
+                    expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218');
+                });
+
+                it('record series', function() {
+                    smoax.register('GET', '/stub/prog/json/rr/4053/218?sl=true', {})
+
+                    var p = $('#eventId .record-series').click();
+
+                    expect($('#eventId').children('.remote-record .recorded').length).to.equal(1);
+                    expect($('#eventId').children('.remote-record .series').length).to.equal(1);
+                    expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218?sl=true');
+                });
+
             });
 
-            it('Records a programme correctly', function () {
+            describe('redirects to sky id', function() {
 
+                it('from remote record or non-series programme', function() {
+                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "S"});
+                    smoax.registerError('GET', '/stub/rractivation/json/serieslinkenabled', 401, 'Not Authorized');
+
+                    var remoteRecordButton = $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/', skyIdUrl: window.location.href + '#redirectUrl'});
+                    var originalLocation = window.location.href;
+
+                    $('#eventId .remote-record').click();
+
+                    expect(window.location.href).to.have.string('#redirectUrl?successUrl=' + encodeURIComponent(originalLocation));
+                });
+
+                it('from remote record activation check for series link', function() {
+                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "R"});
+                    smoax.registerError('GET', '/stub/prog/json/rr/4053/218', 401, 'Not Authorized');
+
+                    var remoteRecordButton = $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/', skyIdUrl: window.location.href + '#redirectUrl'});
+                    var originalLocation = window.location.href;
+
+                    $('#eventId .remote-record').click();
+
+                    expect(window.location.href).to.have.string('#redirectUrl?successUrl=' + encodeURIComponent(originalLocation));
+                });
             });
 
-            it('Records Series link correctly', function () {
 
+            describe('displays popover properly', function() {
+                it('only creates popover once', function() {
+                });
+
+                it('can hide popover', function() {
+                });
             });
 
-            it('Does not populate button when an error occurs', function () {
 
+            describe('handles error cases', function() {
             });
-
         });
 
         mocha.run();
