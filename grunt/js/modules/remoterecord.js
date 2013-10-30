@@ -8,17 +8,30 @@ toolkit.remoterecord = (function(window, $) {
         this.eventId = element.data('eventId');
         this.startTime = element.data('startTime');
         this.element = element;
+        this.constants = {
+            UNABLE_TO_MAKE_REMOTE_RECORD_REQUEST: "Unable to make remote record request",
+            UNABLE_TO_RECORD_PAY_PER_VIEW_BROADCAST: "Unable to record pay-per-view broadcast",
+            UNABLE_TO_DETERMINE_SKY_BOX_DUE_TO_MULTIPLE_VIEWING_CARDS: "Unable to determine Sky+ box due to multiple viewing cards",
+            INTERNAL_ERROR: "Internal error",
+            THIS_PROGRAMME_IS_NOT_AVAILABLE_IN_YOUR_REGION: "This programme is not available in your region",
+            YOU_ARE_NOT_SIGNED_UP_FOR_REMOTE_RECORD: "You are not signed up for remote record",
+            YOU_DO_NOT_HAVE_SKY: "You do not have Sky+",
+            YOU_ARE_NOT_A_SKY_SUBSCRIBER: "You are not a Sky subscriber",
+            YOU_ARE_NOT_LOGGED_IN: "You are not logged in",
+            PROGRAMME_HAS_ALREADY_STARTED: "Programme has already started",
+            PROGRAMME_NOT_FOUND: "Programme not found"
+        }
 
         if (this.channelId && (this.eventId || this.startTime)) {
             this.appendButton();
         } else {
-            this.showMissingAttributeError();
+            this.showError('required attributes data-channel-id or data-event-id / data-start-time not found');
         }
     }
 
     RemoteRecordButton.prototype = {
-        showMissingAttributeError: function() {
-            this.element.html('required attributes data-channel-id or data-event-id / data-start-time not found');
+        showError: function(message) {
+            this.element.html(message);
         },
 
         appendButton: function() {
@@ -71,12 +84,48 @@ toolkit.remoterecord = (function(window, $) {
         record: function(isSeries) {
             var self = this;
             $.ajax({url: this.options.epgServicesUrl + 'prog/json/rr/' + this.channelId + '/' + this.eventId + ( isSeries ? '?sl=true' : '' ), dataType: 'json'})
-                .done(function() {
-                    var rrButton = self.element.find('.remote-record');
-                    rrButton.off('click');
-                    rrButton.addClass('recorded');
-                    if (isSeries) {
-                        rrButton.addClass('series');
+                .done(function(data) {
+                    switch (data.rr) {
+                        case 0:
+                            var rrButton = self.element.find('.remote-record');
+                            rrButton.off('click');
+                            rrButton.addClass('recorded');
+                            if (isSeries) {
+                                rrButton.addClass('series');
+                            }
+                            break;
+                        case 1:
+                            self.showError(self.constants.PROGRAMME_NOT_FOUND);
+                            break;
+                        case 2:
+                            self.showError(self.constants.PROGRAMME_HAS_ALREADY_STARTED);
+                            break;
+                        case 3:
+                            self.showError(self.constants.YOU_ARE_NOT_LOGGED_IN);
+                            break;
+                        case 4:
+                            self.showError(self.constants.YOU_ARE_NOT_A_SKY_SUBSCRIBER);
+                            break;
+                        case 5:
+                            self.showError(self.constants.YOU_DO_NOT_HAVE_SKY);
+                            break;
+                        case 6:
+                            self.showError(self.constants.YOU_ARE_NOT_SIGNED_UP_FOR_REMOTE_RECORD);
+                            break;
+                        case 7:
+                            self.showError(self.constants.THIS_PROGRAMME_IS_NOT_AVAILABLE_IN_YOUR_REGION);
+                            break;
+                        case 8:
+                            self.showError(self.constants.INTERNAL_ERROR);
+                            break;
+                        case 9:
+                            self.showError(self.constants.UNABLE_TO_DETERMINE_SKY_BOX_DUE_TO_MULTIPLE_VIEWING_CARDS);
+                            break;
+                        case 10:
+                            self.showError(self.constants.UNABLE_TO_RECORD_PAY_PER_VIEW_BROADCAST);
+                            break;
+                        default:
+                            self.showError(self.constants.UNABLE_TO_MAKE_REMOTE_RECORD_REQUEST);
                     }
                 })
                 .fail(function() {
@@ -119,7 +168,10 @@ toolkit.remoterecord = (function(window, $) {
             var remoterecord = new RemoteRecordButton($this, options);
         });
     };
-}(window, jQuery));
+}
+    (window, jQuery)
+    )
+;
 
 if (typeof window.define === "function" && window.define.amd) {
     define('modules/remoterecord', [], function() {

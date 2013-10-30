@@ -82,7 +82,7 @@
 
             it('when the item is not a series link, records the programme', function() {
                 smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'R'});
-                smoax.register('GET', '/stub/prog/json/rr/4053/218', {})
+                smoax.register('GET', '/stub/prog/json/rr/4053/218', {"rr": 0})
                 expect($('#eventId').children('.remote-record .recorded').length).to.equal(0);
 
                 $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
@@ -108,7 +108,7 @@
                 });
 
                 it('record once', function() {
-                    smoax.register('GET', '/stub/prog/json/rr/4053/218', {})
+                    smoax.register('GET', '/stub/prog/json/rr/4053/218', {"rr": 0})
 
                     $('#eventId .record-once').click();
 
@@ -118,7 +118,7 @@
                 });
 
                 it('record series', function() {
-                    smoax.register('GET', '/stub/prog/json/rr/4053/218?sl=true', {})
+                    smoax.register('GET', '/stub/prog/json/rr/4053/218?sl=true', {"rr": 0})
 
                     var p = $('#eventId .record-series').click();
 
@@ -165,13 +165,42 @@
                 });
             });
 
+            describe('displays errors properly', function() {
+                var errorCodes = [ 1, 2, 3, 4, 5 , 6, 7, 8, 9, 10, 55 ];
+                var errorMessages = [
+                    "Programme not found",
+                    "Programme has already started",
+                    "You are not logged in",
+                    "You are not a Sky subscriber",
+                    "You do not have Sky+",
+                    "You are not signed up for remote record",
+                    "This programme is not available in your region",
+                    "Internal error",
+                    "Unable to determine Sky+ box due to multiple viewing cards",
+                    "Unable to record pay-per-view broadcast",
+                    "Unable to make remote record request"
+                ];
 
-            describe('handles error cases', function() {
+                for (var x = 0; x < errorCodes.length; x++) {
+                    var errorCode = errorCodes[x];
+                    var errorMessage = errorMessages[x];
+
+                    it('code ' + errorCode + ' returns error ' + errorMessage, function() {
+                        smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'R'});
+                        smoax.register('GET', '/stub/prog/json/rr/4053/218', {"rr": errorCode})
+                        expect($('#eventId').children('.remote-record .recorded').length).to.equal(0);
+
+                        $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                        $('#eventId .remote-record').click();
+
+                        expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218');
+                        expect($('#eventId').html()).to.equal(errorMessage);
+                    });
+                }
             });
         });
 
         mocha.run();
-
     });
 </script>
 
