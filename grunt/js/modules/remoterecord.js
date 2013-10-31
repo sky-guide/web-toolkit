@@ -20,7 +20,7 @@ toolkit.remoterecord = (function(window, $) {
             YOU_ARE_NOT_LOGGED_IN: "You are not logged in",
             PROGRAMME_HAS_ALREADY_STARTED: "Programme has already started",
             PROGRAMME_NOT_FOUND: "Programme not found"
-        }
+        };
 
         if (this.channelId && (this.eventId || this.startTime)) {
             this.appendButton();
@@ -139,6 +139,7 @@ toolkit.remoterecord = (function(window, $) {
 
         showRemoteRecordPopover: function() {
             var self = this,
+                triggerEvents = 'keypress click',
                 popoverHtml = '<ul class="popover"></ul>',
                 popover = $(popoverHtml),
                 recordOnceHtml = '<li><a class="record-once">Record Once</a></li>',
@@ -152,6 +153,7 @@ toolkit.remoterecord = (function(window, $) {
             popover.append(recordOnce);
             popover.append(recordSeries);
             this.element.append(popover);
+
             this.element.find('.popover').addClass('active');
         }
 
