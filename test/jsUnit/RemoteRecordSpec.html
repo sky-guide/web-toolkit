@@ -18,6 +18,7 @@
     <div id="startTime" class="remote-record" data-channel-id="4053" data-start-time="1369845598"></div>
     <div id="noStartTime" class="remote-record" data-channel-id="4053"></div>
     <div id="noChannelId" class="remote-record" data-start-time="4053"></div>
+    <div id="dummy">This is a dummy div</div>
 </div>
 
 </div>
@@ -154,10 +155,23 @@
 
                     expect(window.location.href).to.have.string('#redirectUrl?successUrl=' + encodeURIComponent(originalLocation));
                 });
+
+                it('only redirects to sky id if error is 401', function(){
+
+                });
             });
 
 
             describe('displays popover properly', function() {
+
+                beforeEach(function(){
+                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'S'});
+                    smoax.register('GET', '/stub/rractivation/json/serieslinkenabled', {});
+
+                    $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
+                    $('#eventId .remote-record').click();
+                });
+
                 it('only creates popover once', function() {
                 });
 
