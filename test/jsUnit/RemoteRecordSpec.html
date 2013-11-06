@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <script src="../../dist/scripts/lib/jquery-2.0.3.js"></script>
     <script src="vendor/mocha.js"></script>
+    <script src="vendor/sinon.js"></script>
     <script src="vendor/require.js"></script>
     <script src="config.js"></script>
 
@@ -35,17 +36,28 @@
 <!--TEST-->
 <script>
     require(['modules/remoterecord', '../../test/jsUnit/setup'], function(hash) {
+        function stubEpgCall(stub, url, expectedData) {
+            stub.withArgs({url: url + '?jsonp=jqueryCallback&callback=?', dataType: 'jsonp', async: false, jsonpCallback: 'jqueryCallback'})
+                    .returns(responseSuccess(expectedData));
+        }
+
+        function responseSuccess(data) {
+            var d = $.Deferred();
+            d.resolve(data);
+            return d.promise();
+        }
 
         describe('Remote Record Buttons', function() {
-
             beforeEach(function() {
                 // Initialise smoax and register the matchers
                 chai.use(smoax.setup());
+                ajaxStub = sinon.stub($, "ajax");
             });
 
             afterEach(function() {
                 // Revert $.ajax to a real ajax implementation
                 smoax.release();
+                ajaxStub.reset();
             });
 
             it('generates a remote record button', function() {
@@ -69,63 +81,53 @@
             });
 
             it('gets epg details when channel id and start time is provided', function() {
-                smoax.register('GET', '/stub/prog/json/lookup/4053/1369845598', {"eid": 218});
-                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "S"});
-                smoax.register('GET', '/stub/rractivation/json/serieslinkenabled', {});
+                stubEpgCall(ajaxStub, '/stub/prog/json/lookup/4053/1369845598', {'status': 200, 'body': {'eid': 218}});
+                stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {'rr': 'S'}});
+                stubEpgCall(ajaxStub, '/stub/rractivation/json/serieslinkenabled', {'status': 200, 'body': {}});
 
                 $('#startTime').skycom_remoterecord({epgServicesUrl: '/stub/'});
                 $('#startTime .remote-record').click();
 
-                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/lookup/4053/1369845598');
-                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
-
+                expect($('.remote-record .popover.active').length).to.equal(1);
             });
 
             it('when the item is not a series link, records the programme', function() {
-                smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'R'});
-                smoax.register('GET', '/stub/prog/json/rr/4053/218', {"rr": 0})
+                stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {"rr": 'R'}});
+                stubEpgCall(ajaxStub, '/stub/prog/json/rr/4053/218', {'status': 200, 'body': {"rr": 0}});
                 expect($('#eventId').children('.remote-record .recorded').length).to.equal(0);
 
                 $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                 $('#eventId .remote-record').click();
 
-                expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218');
                 expect($('#eventId').children('.remote-record .recorded').length).to.equal(1);
             });
 
             describe('record from popover menu', function() {
 
                 beforeEach(function() {
-                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'S'});
-                    smoax.register('GET', '/stub/rractivation/json/serieslinkenabled', {});
+                    stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {"rr": 'S'}});
+                    stubEpgCall(ajaxStub, '/stub/rractivation/json/serieslinkenabled', {'status': 200, 'body': {}});
 
                     $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                     $('#eventId .remote-record').click();
                 });
 
-                it('series information is checked', function() {
-                    expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/serieslinkinfo/4053/218');
-                    expect(smoax).to.have.beenInvokedWith('get', '/stub/rractivation/json/serieslinkenabled');
-                });
-
                 it('record once', function() {
-                    smoax.register('GET', '/stub/prog/json/rr/4053/218', {"rr": 0})
+                    stubEpgCall(ajaxStub, '/stub/prog/json/rr/4053/218', {'status': 200, 'body': {"rr": 0}});
 
                     $('#eventId .record-once').click();
 
                     expect($('#eventId').children('.remote-record .recorded').length).to.equal(1);
                     expect($('#eventId').children('.remote-record .series').length).to.equal(0);
-                    expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218');
                 });
 
                 it('record series', function() {
-                    smoax.register('GET', '/stub/prog/json/rr/4053/218?sl=true', {"rr": 0})
+                    stubEpgCall(ajaxStub, '/stub/prog/json/rr/4053/218?sl=true', {'status': 200, 'body': {"rr": 0}});
 
                     var p = $('#eventId .record-series').click();
 
                     expect($('#eventId').children('.remote-record .recorded').length).to.equal(1);
                     expect($('#eventId').children('.remote-record .series').length).to.equal(1);
-                    expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218?sl=true');
                 });
 
             });
@@ -133,8 +135,8 @@
             describe('redirects to sky id', function() {
 
                 it('from remote record or non-series programme', function() {
-                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "S"});
-                    smoax.registerError('GET', '/stub/rractivation/json/serieslinkenabled', 401, 'Not Authorized');
+                    stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {"rr": 'S'}});
+                    stubEpgCall(ajaxStub, '/stub/rractivation/json/serieslinkenabled', {'status': 401, 'body': {}});
 
                     var remoteRecordButton = $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/', skyIdUrl: window.location.href + '#redirectUrl'});
                     var originalLocation = window.location.href;
@@ -145,8 +147,8 @@
                 });
 
                 it('from remote record activation check for series link', function() {
-                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": "R"});
-                    smoax.registerError('GET', '/stub/prog/json/rr/4053/218', 401, 'Not Authorized');
+                    stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {"rr": 'R'}});
+                    stubEpgCall(ajaxStub, '/stub/prog/json/rr/4053/218', {'status': 401, 'body': {}});
 
                     var remoteRecordButton = $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/', skyIdUrl: window.location.href + '#redirectUrl'});
                     var originalLocation = window.location.href;
@@ -156,27 +158,30 @@
                     expect(window.location.href).to.have.string('#redirectUrl?successUrl=' + encodeURIComponent(originalLocation));
                 });
 
-                it('only redirects to sky id if error is 401', function(){
+                it('only if error is 401', function(){
+                    stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {"rr": 'R'}});
+                    stubEpgCall(ajaxStub, '/stub/prog/json/rr/4053/218', {'status': 404, 'body': {}});
 
+                    $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/', skyIdUrl: window.location.href + '#redirectUrl'});
+                    $('#eventId .remote-record').click();
+
+                    expect(window.location.href).to.equal(window.location.href);
+                    expect($('#eventId').text()).to.equal('Unable to make remote record request');
                 });
             });
 
 
             describe('displays popover properly', function() {
-
                 beforeEach(function(){
-                    smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'S'});
-                    smoax.register('GET', '/stub/rractivation/json/serieslinkenabled', {});
+                    stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {"rr": 'S'}});
+                    stubEpgCall(ajaxStub, '/stub/rractivation/json/serieslinkenabled', {'status': 200, 'body': {}});
 
                     $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                     $('#eventId .remote-record').click();
                 });
 
-                it('only creates popover once', function() {
-                });
-
-                it('can hide popover', function() {
-                });
+                it('only creates popover once');
+                it('can hide popover');
             });
 
             describe('displays errors properly', function() {
@@ -200,14 +205,13 @@
                     var errorMessage = errorMessages[x];
 
                     it('code ' + errorCode + ' returns error ' + errorMessage, function() {
-                        smoax.register('GET', '/stub/prog/json/serieslinkinfo/4053/218', {"rr": 'R'});
-                        smoax.register('GET', '/stub/prog/json/rr/4053/218', {"rr": errorCode})
+                        stubEpgCall(ajaxStub, '/stub/prog/json/serieslinkinfo/4053/218', {'status': 200, 'body': {"rr": 'R'}});
+                        stubEpgCall(ajaxStub, '/stub/prog/json/rr/4053/218', {'status': 200, 'body': {"rr": errorCode}});
                         expect($('#eventId').children('.remote-record .recorded').length).to.equal(0);
 
                         $('#eventId').skycom_remoterecord({epgServicesUrl: '/stub/'});
                         $('#eventId .remote-record').click();
 
-                        expect(smoax).to.have.beenInvokedWith('get', '/stub/prog/json/rr/4053/218');
                         expect($('#eventId').html()).to.equal(errorMessage);
                     });
                 }

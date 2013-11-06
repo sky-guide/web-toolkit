@@ -30,27 +30,26 @@ toolkit.remoterecord = (function(window, $) {
         }
     }
 
-    function fetchDataJsonp(url) {
+    function fetchDataJsonp(url, element) {
         var dfd = $.Deferred();
 
-        $.ajax({ url: url + "?jsonp=jqueryCallback&callback=?",
-            dataType: 'jsonp',
-            async: false,
-            jsonpCallback: 'jqueryCallback',
-            contentType: "application/json" })
+        $.ajax({url: url + "?jsonp=jqueryCallback&callback=?",
+                dataType: 'jsonp',
+                async: false,
+                jsonpCallback: 'jqueryCallback'})
             .done(onDone)
             .fail(onFail);
 
         function onDone(response) {
             if(response.status === 200) {
-                dfd.resolve(response.body)
+                dfd.resolveWith(element, [response.body]);
             } else {
-                dfd.reject({status: response.status})
+                dfd.rejectWith(element, [{status: response.status}]);
             }
         }
 
         function onFail(response) {
-            dfd.reject({status: response.status})
+            dfd.rejectWith(element, [{status: response.status}]);
         }
 
         return dfd.promise();
@@ -84,7 +83,7 @@ toolkit.remoterecord = (function(window, $) {
             var self = this;
 
             var url = self.options.epgServicesUrl + 'prog/json/lookup/' + self.channelId + '/' + self.startTime;
-            fetchDataJsonp(url)
+            fetchDataJsonp(url, self)
                 .done(function(data) {
                     self.eventId = data.eid;
                     self.showPopoverOrRecord();
@@ -96,7 +95,7 @@ toolkit.remoterecord = (function(window, $) {
             var self = this;
 
             var url = self.options.epgServicesUrl + 'prog/json/serieslinkinfo/' + self.channelId + '/' + self.eventId;
-            fetchDataJsonp(url)
+            fetchDataJsonp(url, self)
                 .done(self.handleSeriesInfo)
                 .fail(self.handleErrors);
         },
@@ -107,36 +106,12 @@ toolkit.remoterecord = (function(window, $) {
             self.isSeriesLink = ( data.rr == 'S' );
             if (self.isSeriesLink) {
                 var url = self.options.epgServicesUrl + 'rractivation/json/serieslinkenabled';
-                fetchDataJsonp(url)
+                fetchDataJsonp(url, self)
                     .done(self.showRemoteRecordPopover)
                     .fail(self.handleErrors);
             } else {
                 self.record(false);
             }
-        },
-
-        record: function(isSeries) {
-            var self = this;
-
-            var url = self.options.epgServicesUrl + 'prog/json/rr/' + self.channelId + '/' + self.eventId + ( isSeries ? '?sl=true' : '' );
-            fetchDataJsonp(url)
-                .done(function(data) {
-                    if(data.rr == 0) {
-                        var rrButton = self.element.find('.remote-record');
-                        rrButton.off('click');
-                        rrButton.addClass('recorded');
-                        if (isSeries) {
-                            rrButton.addClass('series');
-                        }
-                    } else {
-                        self.handleRecordRequestErrors(data.rr)
-                    }
-                })
-                .fail(self.handleErrors);
-        },
-
-        authenticate: function() {
-            window.location.href = this.options.skyIdUrl + '?successUrl=' + encodeURIComponent(window.location.href);
         },
 
         showRemoteRecordPopover: function() {
@@ -159,9 +134,24 @@ toolkit.remoterecord = (function(window, $) {
             this.element.find('.popover').addClass('active');
         },
 
-        handleRecordRequestErrors: function(errorCode) {
-            var errorMessage = errorMessages[errorCode] || errorMessages[0];
-            self.showError(errorMessage);
+        record: function(isSeries) {
+            var self = this;
+
+            var url = self.options.epgServicesUrl + 'prog/json/rr/' + self.channelId + '/' + self.eventId + ( isSeries ? '?sl=true' : '' );
+            fetchDataJsonp(url, self)
+                .done(function(data) {
+                    if(data.rr == 0) {
+                        var rrButton = self.element.find('.remote-record');
+                        rrButton.off('click');
+                        rrButton.addClass('recorded');
+                        if (isSeries) {
+                            rrButton.addClass('series');
+                        }
+                    } else {
+                        self.handleRecordRequestErrors(data.rr)
+                    }
+                })
+                .fail(self.handleErrors);
         },
 
         handleErrors: function(error) {
@@ -172,6 +162,17 @@ toolkit.remoterecord = (function(window, $) {
             } else {
                 self.showError(errorMessages[0]);
             }
+        },
+
+        handleRecordRequestErrors: function(errorCode) {
+            var self = this;
+
+            var errorMessage = errorMessages[errorCode] || errorMessages[0];
+            self.showError(errorMessage);
+        },
+
+        authenticate: function() {
+            window.location.href = this.options.skyIdUrl + '?successUrl=' + encodeURIComponent(window.location.href);
         }
     };
 
